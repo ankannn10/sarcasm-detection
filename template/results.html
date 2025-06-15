@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}Analysis Results | InsightSphere{% endblock %}
+
+{% block content %}
+<h1 class="text-center mb-4 text-primary">
+  <i class="fas fa-chart-pie"></i> Video Emotion & Engagement
+</h1>
+
+
+<!-- Video Metadata -->
+<div class="card mb-4 shadow-sm">
+  <div class="card-header">
+    <i class="fab fa-youtube"></i> Video Info
+  </div>
+  <div class="card-body row g-3">
+    <div class="col-sm-6"><strong>Title:</strong> {{ video_title }}</div>
+    <div class="col-sm-6"><strong>Channel:</strong> {{ channel_name }}</div>
+    <div class="col-sm-6"><strong>Views:</strong> {{ total_views }}</div>
+    <div class="col-sm-6"><strong>Likes:</strong> {{ total_likes }}</div>
+    <div class="col-sm-6"><strong>Comments:</strong> {{ total_comments }}</div>
+    <div class="col-sm-6"><strong>Subscribers:</strong> {{ total_subscribers }}</div>
+    <div class="col-sm-12">
+      <strong>Uploaded:</strong> {{ upload_date }}
+      <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip"
+         title="Date the video was published"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Performance & Engagement -->
+<div class="card mb-4 shadow-sm">
+  <div class="card-header">
+    <i class="fas fa-tachometer-alt"></i> Performance & Engagement
+  </div>
+  <div class="card-body">
+    <div class="table-responsive mb-4">
+      <table class="table table-bordered table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Metric</th>
+            <th>Value (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Likes vs Views</td><td>{{ likes_to_views_perc }}</td></tr>
+          <tr><td>Comments vs Views</td><td>{{ comments_to_views_perc }}</td></tr>
+          <tr><td>Views vs Subscribers</td><td>{{ views_to_subs_perc }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="row">
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-body text-center">
+            <h6 class="text-primary fw-bold">Likes vs Views</h6>
+            <canvas id="likesViewsBarChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-body text-center">
+            <h6 class="text-primary fw-bold">Comments vs Views</h6>
+            <canvas id="commentsViewsBarChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-body text-center">
+            <h6 class="text-primary fw-bold">Views vs Subscribers</h6>
+            <canvas id="viewsSubsBarChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Comment Filters -->
+<div class="d-flex justify-content-end mb-2">
+  <select id="emotionFilter" class="form-select w-auto me-2">
+    <option value="">All Emotions</option>
+    {% for emo in emotion_distribution.keys() %}
+      <option value="{{ emo }}">{{ emo }}</option>
+    {% endfor %}
+  </select>
+  <select id="ironyFilter" class="form-select w-auto">
+    <option value="">All Irony</option>
+    <option value="Present">Present</option>
+    <option value="Absent">Absent</option>
+  </select>
+</div>
+
+<!-- Top Comments Analysis -->
+{% set emotion_class_map = {
+  "Joy": "emotion-joy",
+  "Anger": "emotion-anger",
+  "Sadness": "emotion-sadness",
+  "Fear": "emotion-fear",
+  "Surprise": "emotion-surprise",
+  "Love": "emotion-love"
+} %}
+<div class="card mb-4 shadow-sm">
+  <div class="card-header">
+    <i class="fas fa-comments"></i> Top Comments Analysis
+  </div>
+  <div class="card-body p-0">
+    {% if report_data %}
+      <div class="table-responsive">
+        <table id="commentsTable" class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Comment</th><th>Emotion</th><th>Conf.</th>
+              <th>Sentiment</th><th>Irony</th><th>Prob.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in report_data %}
+              {% set cls = emotion_class_map.get(row.comment_emotion1, "emotion-default") %}
+              <tr class="{{ cls }}"
+                  data-emotion="{{ row.comment_emotion1 }}"
+                  data-irony="{{ row.Irony }}">
+                <td>{{ row.comment }}</td>
+                <td>{{ row.comment_emotion1 }}</td>
+                <td>{{ row.comment_conf1|round(2) }}</td>
+                <td>{{ row.sentiment }}</td>
+                <td>{{ row.Irony }}</td>
+                <td>{{ row["Irony Probability"]|round(2) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted p-3">No comment data to display.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Insight Summaries -->
+<div class="row mb-4">
+  <div class="col-md-6 mb-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Dominant Emotion</h5>
+        <p class="fs-4 mb-0">{{ overall_emotion }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Irony Rate</h5>
+        {% set irony_count = report_data|selectattr("Irony","equalto","Present")|list|length %}
+        {% set irony_rate = report_data|length > 0 and (irony_count / report_data|length * 100) or 0 %}
+        <p class="fs-4 mb-0">{{ irony_rate|round(1) }}%</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Distribution Pie Charts -->
+<div class="row">
+  <div class="col-md-3 mb-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-header"><i class="fas fa-smile"></i> Sentiment Distribution</div>
+      <div class="card-body"><canvas id="sentimentPieChart"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-header"><i class="fas fa-video"></i> Transcript Emotion Distribution</div>
+      <div class="card-body"><canvas id="transcriptEmotionPieChart"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-header"><i class="fas fa-heart"></i> Emotion Distribution</div>
+      <div class="card-body"><canvas id="emotionPieChart"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-header"><i class="fas fa-user-secret"></i> Irony Distribution</div>
+      <div class="card-body"><canvas id="ironyPieChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Overall Public Opinion -->
+<div class="card mb-4 shadow-sm">
+  <div class="card-header"><i class="fas fa-globe"></i> Overall Public Opinion</div>
+  <div class="card-body">
+    <p>
+      <strong>Overall Sentiment:</strong> {{ overall_sentiment }}<br>
+      <strong>Overall Emotion:</strong> {{ overall_emotion }}
+    </p>
+  </div>
+</div>
+
+<!-- Analyze Another Video Button -->
+<div class="text-center mb-5">
+  <a href="{{ url_for('index') }}" class="btn btn-outline-primary btn-lg">
+    <i class="fas fa-arrow-left"></i> Analyze Another Video
+  </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /***** 0. Data from Flask *****/
+  const sentimentDistribution = JSON.parse('{{ sentiment_distribution | tojson | safe }}');
+  const emotionDistribution  = JSON.parse('{{ emotion_distribution  | tojson | safe }}');
+  const ironyDistribution    = JSON.parse('{{ irony_distribution    | tojson | safe }}');
+  const transcriptEMD        = JSON.parse('{{ transcript_emotion_distribution | tojson | safe }}');
+
+  const likesViewsPerc    = parseFloat('{{ likes_to_views_perc   | safe }}');
+  const commentsViewsPerc = parseFloat('{{ comments_to_views_perc| safe }}');
+  const viewsSubsPerc     = parseFloat('{{ views_to_subs_perc   | safe }}');
+
+  /***** 1. Comment Filtering *****/
+  document.getElementById('emotionFilter').addEventListener('change', function(){
+    const v = this.value;
+    document.querySelectorAll('#commentsTable tbody tr').forEach(r=>{
+      r.style.display = (!v || r.dataset.emotion===v) ? '' : 'none';
+    });
+  });
+  document.getElementById('ironyFilter').addEventListener('change', function(){
+    const v = this.value;
+    document.querySelectorAll('#commentsTable tbody tr').forEach(r=>{
+      r.style.display = (!v || r.dataset.irony===v) ? '' : 'none';
+    });
+  });
+
+  /***** 2. Helper for Bar Colors *****/
+  function getPerformanceColor(val, min, max) {
+    if (val < min) return "#f44336";
+    if (val > max) return "#ff9800";
+    return "#4caf50";
+  }
+
+  /***** 3. Bar Charts *****/
+  // Likes vs Views
+  new Chart(document.getElementById("likesViewsBarChart"), {
+    type: "bar",
+    data: {
+      labels: ["Benchmark","Video"],
+      datasets: [{
+        label: "Likes/Views (%)",
+        data: [1, likesViewsPerc],
+        backgroundColor: ["#E0E0E0", getPerformanceColor(likesViewsPerc,1,5)]
+      }]
+    },
+    options: { scales:{ y:{ beginAtZero:true, max:10 }}, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>ctx.parsed.y+"%" } }}, responsive:true }
+  });
+  // Comments vs Views
+  new Chart(document.getElementById("commentsViewsBarChart"), {
+    type: "bar",
+    data: {
+      labels: ["Benchmark","Video"],
+      datasets: [{
+        label: "Comments/Views (%)",
+        data: [0.5, commentsViewsPerc],
+        backgroundColor: ["#E0E0E0", getPerformanceColor(commentsViewsPerc,0.5,0.5)]
+      }]
+    },
+    options: { scales:{ y:{ beginAtZero:true, max:1 }}, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>ctx.parsed.y+"%" } }}, responsive:true }
+  });
+  // Views vs Subscribers
+  new Chart(document.getElementById("viewsSubsBarChart"), {
+    type: "bar",
+    data: {
+      labels: ["Benchmark","Video"],
+      datasets: [{
+        label: "Views/Subs (%)",
+        data: [10, viewsSubsPerc],
+        backgroundColor: ["#E0E0E0", getPerformanceColor(viewsSubsPerc,10,20)]
+      }]
+    },
+    options: { scales:{ y:{ beginAtZero:true, max:100 }}, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>ctx.parsed.y+"%" } }}, responsive:true }
+  });
+
+  /***** 4. Pie Charts *****/
+  // Sentiment
+  new Chart(document.getElementById("sentimentPieChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(sentimentDistribution),
+      datasets: [{ data: Object.values(sentimentDistribution), backgroundColor: ["#4caf50","#f44336","#9e9e9e"] }]
+    },
+    options:{ responsive:true, plugins:{ legend:{position:"bottom"}, tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${ctx.parsed}%` } } } }
+  });
+  // Emotion
+  new Chart(document.getElementById("emotionPieChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(emotionDistribution),
+      datasets:[{ data: Object.values(emotionDistribution),
+        backgroundColor: Object.keys(emotionDistribution).map(l=>({
+            Joy:"#fff176",Anger:"#ff8a80",Sadness:"#90caf9",
+            Fear:"#ce93d8",Surprise:"#ffb74d",Love:"#f48fb1"
+          }[l]||"#D3D3D3"))
+      }]
+    },
+    options:{ responsive:true, plugins:{ legend:{position:"bottom"}, tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${ctx.parsed}%` } } } }
+  });
+  // Irony
+  new Chart(document.getElementById("ironyPieChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(ironyDistribution),
+      datasets:[{ data: Object.values(ironyDistribution),
+        backgroundColor: Object.keys(ironyDistribution).map(l=>l==="Present"?"#ff9800":"#9e9e9e")
+      }]
+    },
+    options:{ responsive:true, plugins:{ legend:{position:"bottom"}, tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${ctx.parsed}` } } } }
+  });
+  // Transcript Emotion
+  new Chart(document.getElementById("transcriptEmotionPieChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(transcriptEMD),
+      datasets:[{ data: Object.values(transcriptEMD),
+        backgroundColor: Object.keys(transcriptEMD).map(l=>({
+            Joy:"#fff176",Anger:"#ff8a80",Sadness:"#90caf9",
+            Fear:"#ce93d8",Surprise:"#ffb74d",Love:"#f48fb1"
+          }[l]||"#D3D3D3"))
+      }]
+    },
+    options:{ responsive:true, plugins:{ legend:{position:"bottom"}, tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${ctx.parsed}` } } } }
+  });
+</script>
+{% endblock %}
